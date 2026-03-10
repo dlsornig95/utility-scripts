@@ -1,0 +1,22 @@
+# Logs
+*.log
+
+# Claude CLI binaries
+claude.exe
+claude.exe.*
+
+# Claude local settings
+.claude/
+
+# Downloaded executables
+yt-dlp.exe
+
+# Video transcripts (temporary)
+video1.en.vtt
+video2.en.vtt
+
+# Sandbox project (separate repo)
+sandbox/
+
+# Plan files
+sandbox-plan.md
