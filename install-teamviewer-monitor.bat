@@ -6,7 +6,7 @@ echo Installing TeamViewer Monitor as a scheduled task...
 echo.
 
 :: Create scheduled task to run at logon
-schtasks /create /tn "TeamViewerMonitor" /tr "powershell -ExecutionPolicy Bypass -WindowStyle Hidden -File \"%USERPROFILE%\.local\bin\teamviewer-monitor.ps1\"" /sc onlogon /rl highest /f
+schtasks /create /tn "TeamViewerMonitor" /tr "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File %USERPROFILE%\.local\bin\teamviewer-monitor.ps1" /sc onlogon /rl highest /f
 
 if %errorlevel% equ 0 (
     echo.
