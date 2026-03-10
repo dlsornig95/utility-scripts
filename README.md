@@ -39,3 +39,19 @@ Edit `teamviewer-monitor.ps1` or pass parameters:
 | FailuresBeforeReset | 3 | Consecutive failures before WiFi reset |
 | WifiOffDurationSeconds | 5 | How long WiFi stays off during reset |
 | WifiAdapterName | "Wi-Fi" | Name of WiFi adapter |
+| MaxConsecutiveResets | 5 | Max resets before 10-min cooldown |
+
+### Allowed Networks
+
+The monitor only runs when connected to specific WiFi networks. Edit the `$AllowedNetworks` array at the top of `teamviewer-monitor.ps1`:
+
+```powershell
+$AllowedNetworks = @(
+    "SornigHouse"
+    # Add more networks below:
+    # "OfficeWiFi"
+    # "WorkNetwork"
+)
+```
+
+When traveling or connected to other networks, the monitor pauses automatically.

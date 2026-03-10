@@ -6,8 +6,21 @@ param(
     [int]$FailuresBeforeReset = 3,
     [int]$WifiOffDurationSeconds = 5,
     [string]$WifiAdapterName = "Wi-Fi",
-    [string]$LogFile = "$env:USERPROFILE\.local\bin\teamviewer-monitor.log"
+    [string]$LogFile = "$env:USERPROFILE\.local\bin\teamviewer-monitor.log",
+    [int]$MaxConsecutiveResets = 5
 )
+
+# =============================================================================
+# ALLOWED NETWORKS - Add your home/office WiFi names here
+# The monitor will ONLY run when connected to one of these networks
+# =============================================================================
+$AllowedNetworks = @(
+    "SornigHouse"
+    # Add more networks below, one per line:
+    # "OfficeWiFi"
+    # "WorkNetwork"
+)
+# =============================================================================
 
 # TeamViewer master server endpoints to check connectivity
 $TeamViewerServers = @(
@@ -19,7 +32,29 @@ $TeamViewerServers = @(
 
 $TeamViewerLogPath = "C:\Program Files\TeamViewer\TeamViewer15_Logfile.log"
 $ConsecutiveFailures = 0
+$ConsecutiveResets = 0
 $LastLogPosition = 0
+
+function Get-CurrentSSID {
+    try {
+        $output = netsh wlan show interfaces
+        $ssidLine = $output | Select-String -Pattern "^\s*SSID\s*:\s*(.+)$"
+        if ($ssidLine) {
+            return ($ssidLine.Matches[0].Groups[1].Value).Trim()
+        }
+    } catch {
+        return $null
+    }
+    return $null
+}
+
+function Test-AllowedNetwork {
+    $currentSSID = Get-CurrentSSID
+    if (-not $currentSSID) {
+        return $false
+    }
+    return $AllowedNetworks -contains $currentSSID
+}
 
 function Write-Log {
     param([string]$Message)
@@ -127,7 +162,9 @@ Write-Log "========================================="
 Write-Log "TeamViewer Monitor Started"
 Write-Log "Check Interval: $CheckIntervalSeconds seconds"
 Write-Log "Failures before reset: $FailuresBeforeReset"
+Write-Log "Max consecutive resets: $MaxConsecutiveResets"
 Write-Log "WiFi Adapter: $WifiAdapterName"
+Write-Log "Allowed Networks: $($AllowedNetworks -join ', ')"
 Write-Log "========================================="
 
 # Check if running as admin (required for adapter control)
@@ -139,12 +176,39 @@ if (-not $isAdmin) {
 
 while ($true) {
     try {
+        # Check if on an allowed network
+        if (-not (Test-AllowedNetwork)) {
+            $currentSSID = Get-CurrentSSID
+            if ($currentSSID) {
+                # Connected to WiFi but not an allowed network - pause monitoring
+                Write-Log "Not on allowed network ('$currentSSID'). Pausing monitor..."
+                while (-not (Test-AllowedNetwork)) {
+                    Start-Sleep -Seconds 60
+                }
+                Write-Log "Now on allowed network ('$(Get-CurrentSSID)'). Resuming monitor..."
+                $ConsecutiveFailures = 0
+                $ConsecutiveResets = 0
+            } else {
+                # No WiFi connection at all
+                Start-Sleep -Seconds $CheckIntervalSeconds
+                continue
+            }
+        }
+
         # Check WiFi is connected first
         if (-not (Test-WifiConnected -AdapterName $WifiAdapterName)) {
             Write-Log "WiFi not connected, waiting..."
             $ConsecutiveFailures = 0
             Start-Sleep -Seconds $CheckIntervalSeconds
             continue
+        }
+
+        # Check if we've hit max resets (prevent infinite loop)
+        if ($ConsecutiveResets -ge $MaxConsecutiveResets) {
+            Write-Log "Max resets ($MaxConsecutiveResets) reached. Pausing for 10 minutes..."
+            Start-Sleep -Seconds 600
+            $ConsecutiveResets = 0
+            Write-Log "Resuming monitoring after cooldown"
         }
 
         # Test TeamViewer connectivity
@@ -155,6 +219,7 @@ while ($true) {
                 Write-Log "Connection restored after $ConsecutiveFailures failures"
             }
             $ConsecutiveFailures = 0
+            $ConsecutiveResets = 0
         } else {
             $ConsecutiveFailures++
             Write-Log "Connection check failed ($ConsecutiveFailures/$FailuresBeforeReset)"
@@ -166,6 +231,7 @@ while ($true) {
 
                 if ($resetSuccess) {
                     Write-Log "WiFi reset completed, waiting for TeamViewer to reconnect..."
+                    $ConsecutiveResets++
                     Start-Sleep -Seconds 15
                 }
 
