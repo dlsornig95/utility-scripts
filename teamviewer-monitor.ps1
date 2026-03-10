@@ -153,8 +153,6 @@ while ($true) {
         if ($isConnected) {
             if ($ConsecutiveFailures -gt 0) {
                 Write-Log "Connection restored after $ConsecutiveFailures failures"
-            } else {
-                Write-Log "Connection OK"
             }
             $ConsecutiveFailures = 0
         } else {
